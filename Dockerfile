@@ -1,63 +1,88 @@
-# Use an official Ubuntu image as a base
-FROM ubuntu:22.04
+# Use the latest Ubuntu base image
+FROM ubuntu:latest
 
 # Set environment variables
 ENV DEBIAN_FRONTEND=noninteractive
+ENV DISPLAY=:1
+ENV VNC_PORT=5901
+ENV WEBSOCKIFY_PORT=8080
 
-# Update package repository and install required packages
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends software-properties-common && \
-    add-apt-repository ppa:beineri/opt-qt-6.5.0 && \
-    apt-get update && \
-    apt-get install -y \
-    build-essential \
+# Update the package list and install necessary dependencies
+RUN apt-get update && apt-get install -y \
+    git \
     cmake \
-    qt6base-dev \
-    qt6tools-dev-tools \
-    libgtk-3-dev \
-    libglu1-mesa-dev \
-    gcc \
-    g++ \
-    libudev-dev \
+    pkg-config \
+    build-essential \
     libavcodec-dev \
     libavformat-dev \
     libavutil-dev \
-    libswresample-dev \
     libswscale-dev \
-    libevdev-dev \
     libsdl2-dev \
-    bluez \
-    llvm \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/*
+    libxrandr-dev \
+    libxi-dev \
+    libudev-dev \
+    libusb-1.0-0-dev \
+    libasound2-dev \
+    libpulse-dev \
+    libevdev-dev \
+    libmbedtls-dev \
+    libenet-dev \
+    libcurl4-openssl-dev \
+    zlib1g-dev \
+    qtbase5-dev \
+    qtbase5-private-dev \
+    libqt5opengl5-dev \
+    libqt5x11extras5-dev \
+    libminiupnpc-dev \
+    libhidapi-dev \
+    libudev-dev \
+    libsqlite3-dev \
+    python3-dev \
+    python3-pip \
+    ninja-build \
+    libssl-dev \
+    x11vnc \
+    xvfb \
+    novnc \
+    websockify \
+    && apt-get clean
 
-# Clone the Dolphin emulator from the official Git repository and initialize submodules
-RUN git clone --recurse-submodules https://github.com/dolphin-emu/dolphin.git /dolphin
+# Clone the Dolphin Emulator Git repository
+RUN git clone https://github.com/dolphin-emu/dolphin.git /dolphin
 
-# Build Dolphin in release mode and install it
-RUN cd /dolphin && \
-    mkdir build && \
-    cd build && \
-    cmake .. -DCMAKE_BUILD_TYPE=Release && \
-    make -j$(nproc) && \
-    make install
+# Set working directory to Dolphin source
+WORKDIR /dolphin
 
-# Install noVNC and websockify
-RUN git clone https://github.com/novnc/noVNC.git /noVNC && \
-    git clone https://github.com/novnc/websockify.git /websockify && \
-    cd /noVNC && \
-    npm install && \
-    cd /websockify && \
-    apt-get install -y python3-websockify && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
+# Create a build directory and switch to it
+RUN mkdir build && cd build
 
-# Expose ports for noVNC and the websockify server
-EXPOSE 6080 5900
+# Configure the build with CMake
+RUN cd build && cmake .. -GNinja -DCMAKE_BUILD_TYPE=Release
 
-# Command to start the virtual frame buffer, websockify, and noVNC
-CMD ["bash", "-c", "\
-    Xvfb :0 -screen 0 1280x720x24 & \
-    DISPLAY=:0 dolphin-emu --start --headless & \
-    /websockify/run 5900 localhost:5900 --web /noVNC --cert=/etc/ssl/certs/ssl-cert-snakeoil.pem & \
-    /noVNC/utils/launch.sh --vnc localhost:5900 --listen 6080"]
+# Build Dolphin using Ninja
+RUN cd build && ninja
+
+# Expose ports for VNC and Websockify
+EXPOSE 8080
+EXPOSE 5901
+
+# Create and embed the start.sh script directly in the Dockerfile
+RUN echo '#!/bin/bash\n\
+# Start X virtual framebuffer in background\n\
+Xvfb :1 -screen 0 1280x720x16 &\n\
+\n\
+# Start x11vnc on display :1 in background\n\
+x11vnc -display :1 -usepw -forever -shared -rfbport 5901 &\n\
+\n\
+# Start Dolphin Emulator in background\n\
+/dolphin/build/Binaries/dolphin-emu &\n\
+\n\
+# Start websockify to bridge VNC to WebSockets\n\
+websockify --web /usr/share/novnc 8080 localhost:5901\n' > /opt/dolphin-start.sh \
+    && chmod +x /opt/dolphin-start.sh
+
+# Copy the noVNC web files to the container
+RUN cp -r /usr/share/novnc/* /opt/novnc
+
+# Set the entrypoint to run the bash script
+CMD ["/opt/dolphin-start.sh"]
