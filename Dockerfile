@@ -1,63 +1,34 @@
-# Use an official Debian image as a base
-FROM debian:bullseye-slim
+# Use an official Ubuntu image as a base
+FROM ubuntu:22.04
 
 # Set environment variables
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Install required packages
+# Update package repository and install required packages
 RUN apt-get update && apt-get install -y \
-    wget \
-    git \
-    curl \
-    python3 \
-    python3-pip \
-    xvfb \
-    libgl1-mesa-glx \
-    libasound2 \
-    libxi6 \
-    libxrender1 \
-    libxrandr2 \
-    sudo \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/*
-
-# Adding the Debian Testing repository
-RUN echo "deb http://deb.debian.org/debian bookworm main" >> /etc/apt/sources.list.d/bookworm.list && \
-    apt-get update && \
-    apt-get install -y \
     build-essential \
-    gcc-11 \
-    g++-11 \
-    clang \
-    lld \
-    && rm -rf /etc/apt/sources.list.d/bookworm.list && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
-
-# Set GCC and G++ to point to version 11
-RUN update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-11 60 --slave /usr/bin/g++ g++ /usr/bin/g++-11
-
-# Install Node.js from NodeSource
-RUN curl -fsSL https://deb.nodesource.com/setup_18.x | bash - && \
-    apt-get install -y nodejs && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
-
-# Clone the Dolphin emulator from the official Git repository
-RUN git clone https://github.com/dolphin-emu/dolphin.git /dolphin
-
-# Set up Dolphin required dependencies
-RUN cd /dolphin && \
-    apt-get update && \
-    apt-get install -y \
     cmake \
-    qtbase5-dev \
     qt5-qmake \
-    qtbase5-dev-tools \
-    libglu1-mesa-dev \
+    qtbase5-dev \
     libgtk-3-dev \
+    libglu1-mesa-dev \
+    gcc \
+    g++ \
+    libudev-dev \
+    libavcodec-dev \
+    libavformat-dev \
+    libavutil-dev \
+    libswresample-dev \
+    libswscale-dev \
+    libevdev-dev \
+    libsdl2-dev \  # SDL2 development libraries
+    lzma \
+    bzip2 \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
+
+# Clone the Dolphin emulator from the official Git repository and initialize submodules
+RUN git clone --recurse-submodules https://github.com/dolphin-emu/dolphin.git /dolphin
 
 # Build Dolphin in release mode and install it
 RUN cd /dolphin && \
@@ -80,7 +51,7 @@ RUN git clone https://github.com/novnc/noVNC.git /noVNC && \
 # Expose ports for noVNC and the websockify server
 EXPOSE 6080 5900
 
-# Script to start the virtual frame buffer, websockify, and noVNC
+# Command to start the virtual frame buffer, websockify, and noVNC
 CMD ["bash", "-c", "\
     Xvfb :0 -screen 0 1280x720x24 & \
     DISPLAY=:0 dolphin-emu --start --headless & \
