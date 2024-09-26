@@ -5,11 +5,15 @@ FROM ubuntu:22.04
 ENV DEBIAN_FRONTEND=noninteractive
 
 # Update package repository and install required packages
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends software-properties-common && \
+    add-apt-repository ppa:beineri/opt-qt-6.5.0 && \
+    apt-get update && \
+    apt-get install -y \
     build-essential \
     cmake \
-    qt5-qmake \
-    qtbase5-dev \
+    qt6base-dev \
+    qt6tools-dev-tools \
     libgtk-3-dev \
     libglu1-mesa-dev \
     gcc \
@@ -21,9 +25,9 @@ RUN apt-get update && apt-get install -y \
     libswresample-dev \
     libswscale-dev \
     libevdev-dev \
-    libsdl2-dev \  # SDL2 development libraries
-    lzma \
-    bzip2 \
+    libsdl2-dev \
+    bluez \
+    llvm \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
