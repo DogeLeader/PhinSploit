@@ -3,86 +3,48 @@ FROM ubuntu:latest
 
 # Set environment variables
 ENV DEBIAN_FRONTEND=noninteractive
-ENV DISPLAY=:1
-ENV VNC_PORT=5901
-ENV WEBSOCKIFY_PORT=8080
 
-# Update the package list and install necessary dependencies
-RUN apt-get update && apt-get install -y \
-    git \
-    cmake \
-    pkg-config \
+# Install dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
+    cmake \
+    git \
     libavcodec-dev \
     libavformat-dev \
-    libavutil-dev \
-    libswscale-dev \
-    libsdl2-dev \
-    libxrandr-dev \
-    libxi-dev \
-    libudev-dev \
-    libusb-1.0-0-dev \
-    libasound2-dev \
-    libpulse-dev \
-    libevdev-dev \
-    libmbedtls-dev \
-    libenet-dev \
+    libboost-filesystem-dev \
+    libboost-system-dev \
     libcurl4-openssl-dev \
-    zlib1g-dev \
-    qtbase5-dev \
-    qtbase5-private-dev \
-    libqt5opengl5-dev \
-    libqt5x11extras5-dev \
-    libminiupnpc-dev \
-    libhidapi-dev \
-    libudev-dev \
+    libglew-dev \
+    libgtk-3-dev \
+    libjpeg-dev \
+    libopenal-dev \
+    libpng-dev \
+    libsdl2-dev \
     libsqlite3-dev \
-    python3-dev \
-    python3-pip \
-    ninja-build \
-    libssl-dev \
-    x11vnc \
-    xvfb \
-    novnc \
-    websockify \
-    && apt-get clean
+    libudev-dev \
+    libxi-dev \
+    libxrandr-dev \
+    libxss-dev \
+    libxext-dev \
+    libxinerama-dev \
+    libxi-dev \
+    xpra \
+    --no-install-recommends && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
 
-# Clone the Dolphin Emulator Git repository
-RUN git clone https://github.com/dolphin-emu/dolphin.git /dolphin
+# Clone Dolphin emulator repository
+RUN git clone --depth 1 https://github.com/dolphin-emu/dolphin.git /dolphin
 
-# Set working directory to Dolphin source
+# Build Dolphin
 WORKDIR /dolphin
+RUN mkdir build && cd build && \
+    cmake .. && \
+    make -j$(nproc) && \
+    make install
 
-# Create a build directory and switch to it
-RUN mkdir build && cd build
-
-# Configure the build with CMake
-RUN cd build && cmake .. -GNinja -DCMAKE_BUILD_TYPE=Release
-
-# Build Dolphin using Ninja
-RUN cd build && ninja
-
-# Expose ports for VNC and Websockify
+# Expose ports for Xpra
 EXPOSE 8080
-EXPOSE 5901
 
-# Create and embed the start.sh script directly in the Dockerfile
-RUN echo '#!/bin/bash\n\
-# Start X virtual framebuffer in background\n\
-Xvfb :1 -screen 0 1280x720x16 &\n\
-\n\
-# Start x11vnc on display :1 in background\n\
-x11vnc -display :1 -usepw -forever -shared -rfbport 5901 &\n\
-\n\
-# Start Dolphin Emulator in background\n\
-/dolphin/build/Binaries/dolphin-emu &\n\
-\n\
-# Start websockify to bridge VNC to WebSockets\n\
-websockify --web /usr/share/novnc 8080 localhost:5901\n' > /opt/dolphin-start.sh \
-    && chmod +x /opt/dolphin-start.sh
-
-# Copy the noVNC web files to the container
-RUN cp -r /usr/share/novnc/* /opt/novnc
-
-# Set the entrypoint to run the bash script
-CMD ["/opt/dolphin-start.sh"]
+# Start Dolphin and Xpra, binding to the port Render expects
+CMD ["bash", "-c", "cd /dolphin && ./dolphin-emu & xpra start :100 --bind-tcp=0.0.0.0:10000 --html=on && xpra attach tcp:localhost:10000 --html=on"]
