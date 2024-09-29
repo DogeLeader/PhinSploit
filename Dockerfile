@@ -42,7 +42,7 @@ RUN apt-get update && apt-get upgrade -y && apt-get install -y \
     rm -rf /var/lib/apt/lists/*
 
 # Download and install the latest Qt6 version
-RUN wget https://download.qt.io/official_releases/qt/6.5/6.5.1/qt-everywhere-src-6.5.1.tar.xz && \
+RUN wget https://download.qt.io/official_releases/qt/6.5/6.5.1/single/qt-everywhere-src-6.5.1.tar.xz && \
     tar -xf qt-everywhere-src-6.5.1.tar.xz && \
     cd qt-everywhere-src-6.5.1 && \
     ./configure -opensource -confirm-license -nomake tests -nomake examples && \
