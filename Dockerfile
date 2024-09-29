@@ -4,7 +4,12 @@ FROM ubuntu:latest
 # Set environment variables
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Install dependencies
+# Add Xpra official repository to avoid broken package
+RUN apt-get update && apt-get install -y software-properties-common && \
+    add-apt-repository ppa:xpra-org/xpra && \
+    apt-get update
+
+# Install dependencies and handle dpkg errors
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     cmake \
@@ -31,7 +36,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     xauth \
     dbus-x11 \
     xvfb \
-    --no-install-recommends && \
+    --no-install-recommends || true && \
+    apt-get -f install && \
+    dpkg --configure -a && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
