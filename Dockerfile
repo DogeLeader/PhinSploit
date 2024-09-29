@@ -14,6 +14,9 @@ RUN apt-get update && apt-get upgrade -y && apt-get install -y \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
+# Add the official Ubuntu Toolchain PPA for newer versions of some libraries
+RUN add-apt-repository ppa:ubuntu-toolchain-r/test -y && apt-get update
+
 # Update and install dependencies directly from Ubuntu repositories
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
@@ -41,13 +44,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     xauth \
     dbus-x11 \
     xvfb \
+    libevdev-dev \
+    libcubeb-dev \                     
+    libbluetooth-dev \                 
+    llvm \
+    qt6-default \                      
     --no-install-recommends && \
     apt-get autoremove -y && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
-
-# Fix any dpkg errors if present
-RUN dpkg --configure -a || true
 
 # Clone the Dolphin emulator repository
 RUN git clone --depth 1 https://github.com/dolphin-emu/dolphin.git /dolphin
