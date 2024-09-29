@@ -4,12 +4,18 @@ FROM ubuntu:latest
 # Set environment variables
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Add Xpra official repository to avoid broken package
-RUN apt-get update && apt-get install -y software-properties-common && \
-    add-apt-repository ppa:xpra-org/xpra && \
-    apt-get update
+# Ensure the system is up-to-date and install prerequisite tools
+RUN apt-get update && apt-get upgrade -y && apt-get install -y \
+    software-properties-common \
+    apt-transport-https \
+    ca-certificates \
+    wget \
+    curl
 
-# Install dependencies and handle dpkg errors
+# Add Xpra official repository to avoid broken packages and outdated versions
+RUN add-apt-repository ppa:xpra-org/xpra -y
+
+# Update and install all dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     cmake \
@@ -36,13 +42,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     xauth \
     dbus-x11 \
     xvfb \
-    --no-install-recommends || true && \
+    --no-install-recommends && \
     apt-get -f install && \
-    dpkg --configure -a && \
+    apt-get autoremove -y && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-# Clone Dolphin emulator repository
+# Fix any dpkg errors if present
+RUN dpkg --configure -a || true
+
+# Clone the Dolphin emulator repository
 RUN git clone --depth 1 https://github.com/dolphin-emu/dolphin.git /dolphin
 
 # Build Dolphin
