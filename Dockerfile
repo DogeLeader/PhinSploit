@@ -14,12 +14,8 @@ RUN apt-get update && apt-get upgrade -y && apt-get install -y \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-# Add Xpra official repository to avoid broken packages
-RUN add-apt-repository ppa:xpra-org/xpra -y && \
-    apt-get update
-
-# Install all dependencies and remove temporary files after installation to save space
-RUN apt-get install -y --no-install-recommends \
+# Update and install dependencies directly from Ubuntu repositories
+RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     cmake \
     git \
