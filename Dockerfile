@@ -27,8 +27,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libxss-dev \
     libxext-dev \
     libxinerama-dev \
-    libxi-dev \
     xpra \
+    xauth \
+    dbus-x11 \
+    xvfb \
     --no-install-recommends && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
@@ -43,8 +45,8 @@ RUN mkdir build && cd build && \
     make -j$(nproc) && \
     make install
 
-# Expose ports for Xpra
-EXPOSE 8080
+# Expose the port that Render expects
+EXPOSE 10000
 
-# Start Dolphin and Xpra, binding to the port Render expects
-CMD ["bash", "-c", "cd /dolphin && ./dolphin-emu & xpra start :100 --bind-tcp=0.0.0.0:10000 --html=on && xpra attach tcp:localhost:10000 --html=on"]
+# Start Dolphin and Xpra with the web client
+CMD ["bash", "-c", "xpra start :100 --bind-tcp=0.0.0.0:10000 --html=on --daemon=no --start-child='/dolphin/build/Binaries/dolphin-emu'"]
