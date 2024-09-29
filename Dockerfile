@@ -10,13 +10,16 @@ RUN apt-get update && apt-get upgrade -y && apt-get install -y \
     apt-transport-https \
     ca-certificates \
     wget \
-    curl
+    curl && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
 
-# Add Xpra official repository to avoid broken packages and outdated versions
-RUN add-apt-repository ppa:xpra-org/xpra -y
+# Add Xpra official repository to avoid broken packages
+RUN add-apt-repository ppa:xpra-org/xpra -y && \
+    apt-get update
 
-# Update and install all dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
+# Install all dependencies and remove temporary files after installation to save space
+RUN apt-get install -y --no-install-recommends \
     build-essential \
     cmake \
     git \
@@ -43,10 +46,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     dbus-x11 \
     xvfb \
     --no-install-recommends && \
-    apt-get -f install && \
     apt-get autoremove -y && \
     apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
+    rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
 # Fix any dpkg errors if present
 RUN dpkg --configure -a || true
