@@ -1,74 +1,94 @@
+# Use Ubuntu as base image
 FROM ubuntu:latest
 
-# Environment settings
+# Set environment variables
 ENV DEBIAN_FRONTEND=noninteractive
-ENV QT_INSTALL_DIR=/opt/qt6.5.1
 
-# Install required dependencies
-RUN apt-get update && apt-get upgrade -y && apt-get install -y \
-    software-properties-common \
-    apt-transport-https \
-    ca-certificates \
-    wget \
-    curl \
+# Install dependencies for Dolphin and noVNC/websockify
+RUN apt-get update && \
+    apt-get install -y \
+    git \
     build-essential \
     cmake \
-    git \
     libavcodec-dev \
     libavformat-dev \
-    libboost-filesystem-dev \
-    libboost-system-dev \
+    libavutil-dev \
+    libsdl2-dev \
+    libsfml-dev \
+    libx11-dev \
+    libxext-dev \
+    libxtst-dev \
+    libxrandr-dev \
+    libxrender-dev \
+    libxi-dev \
+    libxxf86vm-dev \
+    libxinerama-dev \
+    libglu1-mesa-dev \
+    libsdl2-image-dev \
+    libssl-dev \
     libcurl4-openssl-dev \
-    libglew-dev \
+    libudev-dev \
+    libasound2-dev \
+    libpulse-dev \
+    libao-dev \
+    libopenal-dev \
+    libxrandr-dev \
+    libegl1-mesa-dev \
+    libgles2-mesa-dev \
+    libglib2.0-dev \
+    libfontconfig1-dev \
+    libavfilter-dev \
+    libswscale-dev \
+    libmbedtls-dev \
+    libbz2-dev \
+    libpng-dev \
+    zlib1g-dev \
+    libminiupnpc-dev \
+    libhidapi-dev \
+    libusb-1.0-0-dev \
+    libudev-dev \
+    libcairo2-dev \
+    libvulkan-dev \
+    vulkan-utils \
     libgtk-3-dev \
     libjpeg-dev \
-    libopenal-dev \
-    libpng-dev \
-    libsdl2-dev \
-    libsqlite3-dev \
-    libudev-dev \
-    libxi-dev \
-    libxrandr-dev \
-    libxss-dev \
-    libxext-dev \
-    libxinerama-dev \
-    xauth \
-    dbus-x11 \
-    xvfb \
-    libevdev-dev \
-    libcubeb-dev \
-    libbluetooth-dev \
-    llvm \
-    qtbase5-dev \
-    qt6-base-dev \
-    --no-install-recommends
+    libpulse-dev \
+    libsamplerate0-dev \
+    python3 \
+    python3-pip \
+    wget \
+    novnc \
+    websockify \
+    xfce4 \
+    xfce4-terminal \
+    && rm -rf /var/lib/apt/lists/*
 
-# Clean up APT when done
-RUN apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
+# Install noVNC and websockify
+RUN pip3 install --no-cache-dir websockify
 
-# Download and install Qt 6.5.1
-RUN wget https://download.qt.io/official_releases/qt/6.5/6.5.1/single/qt-everywhere-src-6.5.1.tar.xz && \
-    tar -xf qt-everywhere-src-6.5.1.tar.xz && \
-    cd qt-everywhere-src-6.5.1 && \
-    ./configure -prefix $QT_INSTALL_DIR -opensource -confirm-license -nomake tests -nomake examples && \
-    make -j$(nproc) && \
-    make install && \
-    cd .. && \
-    rm -rf qt-everywhere-src-6.5.1 qt-everywhere-src-6.5.1.tar.xz
-
-# Clone Dolphin emulator repository
-RUN git clone --depth 1 https://github.com/dolphin-emu/dolphin.git /dolphin
-
-# Build Dolphin emulator
-WORKDIR /dolphin
-RUN mkdir build && cd build && \
+# Clone the Dolphin repository and build it
+RUN git clone https://github.com/dolphin-emu/dolphin.git && \
+    cd dolphin && \
+    mkdir Build && \
+    cd Build && \
     cmake .. && \
     make -j$(nproc) && \
-    make install
+    cd ../..
 
-# Expose the desired port
-EXPOSE 10000
+# Set up noVNC
+RUN mkdir -p /opt/novnc && \
+    cp -r /usr/share/novnc/* /opt/novnc/ && \
+    wget -O /opt/novnc/vnc.html https://github.com/novnc/noVNC/releases/download/v1.3.0/vnc.html
 
-# Start command with xpra
-CMD ["bash", "-c", "xpra start :100 --bind-tcp=0.0.0.0:10000 --html=on --daemon=no --start-child='/dolphin/build/Binaries/dolphin-emu
+# Create a startup script
+RUN echo '#!/bin/bash' > /start.sh && \
+    echo 'websockify --web=/opt/novnc --cert=/cert.pem --key=/key.pem 6080 localhost:5900 &' >> /start.sh && \
+    echo 'xfce4-session &' >> /start.sh && \
+    echo 'dolphin-emu-nogui &' >> /start.sh && \
+    chmod +x /start.sh
+
+# Expose port for noVNC
+EXPOSE 6080
+
+# Run the startup script
+CMD ["/start.sh"]
