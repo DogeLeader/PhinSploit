@@ -15,6 +15,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libvulkan-dev \
     libxi-dev \
     libxrandr-dev \
+    libevdev-dev \
     libxinerama-dev \
     libx11-dev \
     libasound2-dev \
@@ -24,14 +25,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libudev-dev \
     pkg-config \
     python3 \
-    python3-pip \
-    python3-setuptools \
-    libgtkmm-3.0-dev \
+    python3-venv \
     && rm -rf /var/lib/apt/lists/*
 
 # Clone the Dolphin repository and build it
 WORKDIR /dolphin
-RUN git clone --depth=1 https://github.com/dolphin-emu/dolphin.git . \
+RUN git clone --depth=1 --recurse-submodules https://github.com/dolphin-emu/dolphin.git . \
     && mkdir build \
     && cd build \
     && cmake .. -DCMAKE_BUILD_TYPE=Release \
@@ -44,10 +43,15 @@ FROM debian:bookworm-slim
 RUN apt-get update && apt-get install -y --no-install-recommends \
     xvfb \
     python3 \
-    python3-pip \
-    && pip3 install websockify \
-    && apt-get clean \
+    python3-venv \
+    git \
     && rm -rf /var/lib/apt/lists/*
+
+# Create a virtual environment for Python
+RUN python3 -m venv /opt/venv
+
+# Install websockify in the virtual environment
+RUN /opt/venv/bin/pip install websockify
 
 # Copy the built Dolphin emulator from the builder stage
 COPY --from=builder /dolphin/build/bin/Dolphin /usr/local/bin/Dolphin
@@ -57,4 +61,4 @@ RUN git clone --depth=1 https://github.com/novnc/noVNC.git /opt/noVNC
 
 # Set up the working directory and entry point
 WORKDIR /opt/noVNC
-CMD ["sh", "-c", "xvfb-run --server-args='-screen 0 1024x768x24' /usr/local/bin/Dolphin --no-splash-screen --config-path=/dev/null & websockify --web /opt/noVNC 8080 localhost:5900"]
+CMD ["sh", "-c", "xvfb-run --server-args='-screen 0 1024x768x24' /usr/local/bin/Dolphin --no-splash-screen --config-path=/dev/null & /opt/venv/bin/websockify --web /opt/noVNC 8080 localhost:5900"]
