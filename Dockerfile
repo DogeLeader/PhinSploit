@@ -1,77 +1,38 @@
-# Use Debian Bookworm Slim as the base image
-FROM debian:bookworm-slim AS builder
+# Use the official Alpine base image
+FROM alpine:latest
 
-# Install necessary dependencies for building Dolphin
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    git \
-    build-essential \
-    cmake \
-    libgtk-3-dev \
-    libglew-dev \
-    libglib2.0-dev \
-    libao-dev \
-    libboost-dev \
-    libsdl2-dev \
-    libvulkan-dev \
-    libxi-dev \
-    libxrandr-dev \
-    libxinerama-dev \
-    libx11-dev \
-    libasound2-dev \
-    libavcodec-dev \
-    libavformat-dev \
-    libswscale-dev \
-    libudev-dev \
-    libevdev-dev \
-    liblzo2-dev \
-    libcubeb-dev \
-    libbluetooth-dev \
-    llvm \
-    qt6-base-dev \
-    qt6-svg-dev \                 
-    pkg-config \
-    python3 \
-    python3-venv \
-    && rm -rf /var/lib/apt/lists/*
+# Set environment variables to avoid prompts during package installation
+ENV LANG=C.UTF-8
 
-# Clone the Dolphin repository and build it
-WORKDIR /dolphin
-RUN git clone --depth=1 --recurse-submodules https://github.com/dolphin-emu/dolphin.git . \
-    && mkdir build \
-    && cd build \
-    && cmake .. -DCMAKE_BUILD_TYPE=Release \
-    && make -j$(nproc)
-
-# Create the final lightweight image
-FROM debian:bookworm-slim
-
-# Install packages necessary for running noVNC and websockify
-RUN apt-get update && apt-get install -y --no-install-recommends \
+# Install necessary dependencies: Dolphin Emulator, x11vnc, noVNC, and other utilities
+RUN apk update && apk add --no-cache \
+    dolphin-emulator \
+    x11vnc \
+    novnc \
+    websockify \
+    bash \
+    xf86-video-fbdev \
+    xorg-server \
     xvfb \
-    python3 \
-    python3-venv \
-    git \
-    libevdev-dev \
-    liblzo2-dev \  
-    libcubeb-dev \ 
-    libminizip-dev \  
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/cache/apk/*
 
-# Create a virtual environment for Python
-RUN python3 -m venv /opt/venv
+# Disable unnecessary GPU drivers or conflicting video drivers
+# We'll create an Xorg configuration that forces it to use fbdev (framebuffer driver)
+RUN echo -e "Section \"Device\"\n  Identifier  \"Default Device\"\n  Driver      \"fbdev\"\nEndSection" > /etc/X11/xorg.conf.d/00-device.conf
 
-# Install websockify in the virtual environment
-RUN /opt/venv/bin/pip install websockify
+# Create necessary directories for VNC and Dolphin emulator
+RUN mkdir -p /root/.vnc /root/.dolphin-emu
 
-# Copy built Dolphin emulator from the builder stage
-COPY --from=builder /dolphin/build/bin/Dolphin /usr/local/bin/Dolphin
+# Set up VNC password (you can change the password here)
+RUN echo "root" | vncpasswd -f > /root/.vnc/passwd && chmod 600 /root/.vnc/passwd
 
-# Clone noVNC and install dependencies for better performance
-RUN git clone --depth=1 https://github.com/novnc/noVNC.git /opt/noVNC
+# Expose the default VNC port (5900) and the noVNC web port (6080)
+EXPOSE 5900 6080
 
-# Set environment variables for noVNC
-ENV NOVNC_PNG_COMPRESSION=1
+# Set the working directory
+WORKDIR /root
 
-# Set up the working directory and entry point
-WORKDIR /opt/noVNC
-CMD ["sh", "-c", "xvfb-run --server-args='-screen 0 1024x768x24' /usr/local/bin/Dolphin --no-splash-screen --config-path=/dev/null & /opt/venv/bin/websockify --web /opt/noVNC --cert=/path/to/cert.pem --key=/path/to/key.pem -D 8080 localhost:5900"]
+# Start the VNC server with a virtual framebuffer and noVNC web server
+CMD bash -c "xvfb-run --server-args='-screen 0 1280x720x24' dolphin-emu & \
+    x11vnc -display :99 -forever -nopw -listen localhost -xkb -bg && \
+    websockify --web=/usr/share/novnc/ 6080 localhost:5900"
